@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -eu
+
+if ! cargo fmt -- --check --quiet
+then
+    echo "There are some code style issues."
+    echo "Running `cargo fmt` to fix them."
+    if ! cargo fmt
+    then
+        echo "Failed to run `cargo fmt`."
+        exit 1
+    fi
+    exit 1
+fi
+
+if ! cargo clippy --all-targets
+then
+    echo "There are some clippy issues."
+    exit 1
+fi
+# Add your test into the regex as needed. Also `cargo install nextest` or better `cargo binstall nextest`
+#if ! cargo nextest run --tests  -E 'not test(/.*foobar/)'
+#then
+#    echo "There are some test issues."
+#    exit 1
+#fi
+
+exit 0
