@@ -4,8 +4,7 @@
 
 use crate::{
     crypto::Crypto, forward::Forward, routing::{consts as routing_consts, RoutingTable, TableRef}, rpc::{KadNetwork, Network}, score::ScoreManager, store::{consts as store_consts, Store, StoreEntry}, util::{
-        hash, timestamp, Addr, Data, FindValueResult, Hash, Kv, Peer, ProviderRecord, RpcContext,
-        RpcOp, RpcResult, RpcResults, SinglePeer, Value,
+        hash, shh, timestamp, Addr, Data, FindValueResult, Hash, Kv, Peer, ProviderRecord, RpcContext, RpcOp, RpcResult, RpcResults, SinglePeer, Value
     }, vat::Vat, U256
 };
 use anyhow::Result;
@@ -226,7 +225,7 @@ impl Kad {
                 refresh_handle: Mutex::new(None),
                 republish_handle: Mutex::new(None),
                 node: n.clone(),
-                vat: Arc::new(Vat::new(n.table.id, gadget.clone())),
+                vat: Arc::new(Vat::new(n.table.id, kad_gadget.clone())),
                 runtime: rt,
             }
         });
@@ -377,7 +376,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::Kvs};
+    /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -429,7 +428,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::Kvs};
+    /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -493,7 +492,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::Kvs};
+    /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -529,7 +528,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::{Kvs, Hash}};
+    /// use kadc::{node::Kad, forward::IGD, util::{Kvs, Hash}};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -611,7 +610,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::Hash};
+    /// use kadc::{node::Kad, forward::IGD, util::Hash};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -633,7 +632,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::{Kvs, ProviderRecord}};
+    /// use kadc::{node::Kad, forward::IGD, util::{Kvs, ProviderRecord}};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -684,7 +683,7 @@ impl Kad {
     /// # Example
     ///
     /// ```
-    /// use kad::{node::Kad, forward::IGD, util::Kvs};
+    /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
     /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
     /// node.clone().serve().unwrap();
@@ -1233,12 +1232,30 @@ impl InnerKad {
         ()
     );
 
+    kad_fn!(
+        abort,
+        |reason: String| RpcOp::Abort(reason),
+        (),
+        |node: Arc<InnerKad>, res: RpcResults, resp: SinglePeer| async move {
+            if let RpcResult::Abort = res.0.clone() {
+                node.scoring.increase(resp.id).await;
+                
+                Ok(((), resp))
+            } else {
+                node.scoring.decrease(resp.id).await;
+
+                Err(Box::new(resp))
+            }
+        },
+        (reason: String)
+    );
+
     // returns a list with all nodes that have not responded
     async fn iter_store(self: Arc<Self>, key: Hash, entry: StoreEntry) -> Vec<SinglePeer> {
         let mut bad_peers: Vec<SinglePeer> = vec![];
 
         for peer in self.clone().iter_find_node(key).await {
-            debug!("storing at {:#x}", peer.id);
+            debug!("storing at {}", shh(peer.id));
             tokio::task::block_in_place(|| {
                 if let Err(bad) = self.clone().store(peer, key, entry.clone()) {
                     bad_peers.push(*bad);
@@ -1476,7 +1493,7 @@ mod tests {
 
         // check if everyone got the new value
         nodes.iter().for_each(|n| {
-            debug!("checking node {:#x}", n.id());
+            debug!("checking node {}", shh(n.id()));
             assert_eq!(
                 block_on(n.node.store.get(&hash("good morning"))).unwrap(),
                 new

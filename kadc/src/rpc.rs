@@ -1,7 +1,7 @@
 use crate::{
     node::{InnerKad, Kad, RealPinger},
-    util::{Addr, FindValueResult, Peer, RpcArgs, RpcOp, RpcResult, RpcResults, SinglePeer},
-    vat::{ExportEntry, RemoteRef, Vat},
+    util::{shh, Addr, FindValueResult, Peer, RpcArgs, RpcOp, RpcResult, RpcResults, SinglePeer},
+    vat::{Descriptor, ExportEntry, ExportId, RemoteRef, Session, Vat},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -17,7 +17,7 @@ use tarpc::{
     tokio_serde::formats::Json,
     transport::channel::{ChannelError, UnboundedChannel},
 };
-use tokio::time::timeout;
+use tokio::{sync::RwLock, time::timeout};
 use tracing::{debug, error};
 
 pub(crate) mod consts {
@@ -40,6 +40,8 @@ pub(crate) trait RpcService {
     
     // object commands
     async fn start_session(args: RpcArgs) -> RpcResults;
+    async fn abort(args: RpcArgs) -> RpcResults;
+    async fn deliver_only(args: RpcArgs) -> RpcResults;
 }
 
 #[derive(Clone)]
@@ -103,7 +105,7 @@ impl Service {
             Err(self
                 .node
                 .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad))
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("crypto verify fail"))))
         }
     }
 }
@@ -115,7 +117,7 @@ impl RpcService for Service {
             if let Ok(k) = self.node.crypto.public_key_as_string() {
                 RpcResult::Key(k)
             } else {
-                RpcResult::Bad
+                RpcResult::Bad(String::from("key serialization fail"))
             },
         )
     }
@@ -139,7 +141,7 @@ impl RpcService for Service {
                     },
                 )
             } else {
-                RpcResult::Bad
+                RpcResult::Bad(String::from("invalid operation"))
             },
             self.node.create_ctx(),
             String::new(),
@@ -160,7 +162,7 @@ impl RpcService for Service {
 
                 RpcResult::GetConfidence(self.node.scoring.get_score(id).await)
             } else {
-                RpcResult::Bad
+                RpcResult::Bad(String::from("invalid operation"))
             },
         )
     }
@@ -180,13 +182,13 @@ impl RpcService for Service {
                 if self.node.store.put(sender, k, *v).await {
                     RpcResult::Store
                 } else {
-                    RpcResult::Bad
+                    RpcResult::Bad(String::from("value storage fail"))
                 },
             )
         } else {
             self.node
                 .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad)
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
         }
     }
 
@@ -206,7 +208,7 @@ impl RpcService for Service {
 
                 RpcResult::FindNode(bkt)
             } else {
-                RpcResult::Bad
+                RpcResult::Bad(String::from("invalid operation"))
             },
         )
     }
@@ -236,7 +238,7 @@ impl RpcService for Service {
         } else {
             self.node
                 .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad)
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
         }
     }
 
@@ -250,24 +252,29 @@ impl RpcService for Service {
         if let RpcOp::StartSession = args.0.op {
             self.node.table.clone().update::<RealPinger>(sender).await;
 
+            // create new session
             {
-                let mut exports_lock = self.vat.exports.write().await;
+                let mut sessions_lock = self.vat.sessions.write().await;
 
-                // we already export a bootstrap object
-                if !exports_lock.is_empty() {
+                // check for duplicate session
+                if sessions_lock.contains_key(&args.0.id) {
                     return self.node
                         .crypto
-                        .results(self.node.create_ctx(), RpcResult::Bad);
+                        .results(self.node.create_ctx(), RpcResult::Bad(String::from("duplicate session")));
                 }
 
-                // export bootstrap object
-                exports_lock.push(ExportEntry {
-                    remote: false,
+                let new_session = Arc::new(Session::new(Arc::downgrade(&self.vat)));
+
+                // export bootstrap object, it will always have an id 0
+                new_session.export(ExportId::from(0), ExportEntry {
                     ref_count: AtomicU64::new(0),
-                });
+                    object: Some(new_session.make_bootstrap())
+                }).await;
+
+                sessions_lock.insert(args.0.id, new_session);
             }
 
-            // this is only a formality, we would always reference slot 0
+            // this is only a formality, we would always reference slot 0 for bootstrap
             self.node.crypto.results(
                 self.node.create_ctx(),
                 RpcResult::StartSession(RemoteRef {
@@ -278,7 +285,81 @@ impl RpcService for Service {
         } else {
             self.node
                 .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad)
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+        }
+    }
+
+    async fn abort(self, _: context::Context, args: RpcArgs) -> RpcResults {
+        if let Err(r) = self.verify(&args).await {
+            return r;
+        }
+
+        if let RpcOp::Abort(reason) = args.0.op {
+            debug!("peer {} is aborting cap session: {}", shh(args.0.id), reason);
+
+            let mut sessions_lock = self.vat.sessions.write().await;
+
+            if sessions_lock.remove(&args.0.id).is_some() {
+                self.node.crypto.results(self.node.create_ctx(), RpcResult::Abort)
+            } else {
+                self.node.crypto.results(self.node.create_ctx(), RpcResult::Bad(String::from("no session to abort")))
+            }
+        } else {
+            self.node
+                .crypto
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+        }
+    }
+
+    async fn deliver_only(self, _: context::Context, args: RpcArgs) -> RpcResults {
+        if let Err(r) = self.verify(&args).await {
+            return r;
+        }
+
+        let sender = SinglePeer::new(args.0.id, args.0.addr);
+
+        if let RpcOp::DeliverOnly(obj, method, method_args) = args.0.op {
+            self.node.table.clone().update::<RealPinger>(sender).await;
+
+            let sessions_lock = self.vat.sessions.read().await;
+
+            if let Some(session) = sessions_lock.get(&args.0.id) {
+                match obj {
+                    Descriptor::ReceiverHosted(export_id) => {
+                        let exports = session.exports.read().await;
+                        return if exports.get(&export_id)
+                            .and_then(|export| export.object.as_ref())
+                            .and_then(|object| object.methods.get(&method))
+                            .and_then(|method| match method(method_args) {
+                                // we ignore the result for deliver_only
+                                crate::vat::Value::Err(_) => None,
+                                other => Some(other),
+                            })
+                            .is_some() {
+                            self.node.crypto.results(self.node.create_ctx(), RpcResult::DeliverOnly)
+                        } else {
+                            self.node
+                                .crypto
+                                .results(self.node.create_ctx(), RpcResult::Bad(String::from("object/method does not exist")))
+                        };
+                    },
+                    // we cannot send to references we do not possess
+                    _ => { 
+                        return self.node
+                            .crypto
+                            .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation"))); 
+                    },
+                }
+            } else {
+                // if session does not exist, throw error
+                return self.node
+                    .crypto
+                    .results(self.node.create_ctx(), RpcResult::Bad(String::from("session does not exist")));
+            }
+        } else {
+            self.node
+                .crypto
+                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
         }
     }
 }
@@ -368,7 +449,7 @@ pub(crate) trait Network {
                                 client: RpcServiceClient::new(client::Config::default(), clt)
                                     .spawn(),
                                 node: node_.clone(),
-                                vat: kad_.vat.clone(),
+                                vat: kad_.vat.clone(), 
                             };
 
                             BaseChannel::with_defaults(srv)
@@ -705,6 +786,43 @@ mod tests {
         } else {
             panic!("not a list of nodes");
         }
+
+        first.stop::<NoFwd>();
+        second.stop::<NoFwd>();
+    }
+
+    #[traced_test]
+    #[test]
+    fn start_abort() {
+        let (first, second) = (
+            Kad::new::<NoFwd>(16171, false, true).unwrap(),
+            Kad::new::<NoFwd>(16172, false, true).unwrap(),
+        );
+        first.clone().serve().unwrap();
+        second.clone().serve().unwrap();
+
+        let second_addr = second.clone().addr();
+        let second_peer = Peer::new(second.clone().id(), second_addr);
+
+        assert!(first.node.clone().start_session(second_peer.clone()).is_ok());
+
+        // does the session exist
+        let second_ = second.clone();
+        let first_id = first.id();
+        block_on(async move {
+            let sessions_lock = second_.vat.sessions.read().await;
+
+            assert!(sessions_lock.contains_key(&first_id));
+        });
+
+        // this call should fail because we already started a session
+        assert!(first.node.clone().start_session(second_peer.clone()).is_err());
+
+        // okay
+        assert!(first.node.clone().abort(second_peer.clone(), String::from("example abort")).is_ok());
+        
+        // fail
+        assert!(first.node.clone().abort(second_peer, String::from("example abort 2")).is_err());
 
         first.stop::<NoFwd>();
         second.stop::<NoFwd>();

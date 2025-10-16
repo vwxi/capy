@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 use crate::node::InnerKad;
-use crate::util::Hash;
+use crate::util::{shh, Hash};
 
 pub(crate) mod consts {
     pub(crate) const ALPHA: f64 = 0.95f64;
@@ -270,14 +270,14 @@ impl ScoreManager {
     pub(crate) async fn increase(&self, peer: Hash) {
         let mut lock = self.scoring.lock().await;
 
-        debug!("change reputation of {:#x} by {}", peer, consts::POSITIVE_R);
+        debug!("change reputation of {} by {}", shh(peer), consts::POSITIVE_R);
         lock.modify(peer, consts::POSITIVE_R);
     }
 
     pub(crate) async fn decrease(&self, peer: Hash) {
         let mut lock = self.scoring.lock().await;
 
-        debug!("change reputation of {:#x} by {}", peer, consts::NEGATIVE_R);
+        debug!("change reputation of {} by {}", shh(peer), consts::NEGATIVE_R);
         lock.modify(peer, consts::NEGATIVE_R);
     }
 

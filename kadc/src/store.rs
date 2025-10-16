@@ -1,6 +1,6 @@
 use crate::{
     node::InnerKad,
-    util::{timestamp, Data, Entry, Hash, ProviderRecord, SinglePeer, Value},
+    util::{shh, timestamp, Data, Entry, Hash, ProviderRecord, SinglePeer, Value},
 };
 use futures::Future;
 use std::{collections::HashMap, sync::Weak};
@@ -113,8 +113,8 @@ impl Store {
         {
             // return if unable to acquire
             warn!(
-                "unable to acquire origin key for peer {:x}",
-                entry.0.origin.id
+                "unable to acquire origin key for peer {}",
+                shh(entry.0.origin.id)
             );
             return false;
         }
@@ -130,7 +130,7 @@ impl Store {
             .await
         {
             // return if unable to acquire
-            warn!("unable to acquire sender key for peer {:x}", sender.id);
+            warn!("unable to acquire sender key for peer {}", shh(sender.id));
             return false;
         }
 
@@ -144,7 +144,7 @@ impl Store {
             )
             .await
         {
-            warn!("sender signature invalid for sender {:x}", sender.id);
+            warn!("sender signature invalid for sender {}", shh(sender.id));
             return false;
         }
 
@@ -159,8 +159,8 @@ impl Store {
             .await
         {
             warn!(
-                "origin signature invalid for origin {:x}",
-                entry.0.origin.id
+                "origin signature invalid for origin {}",
+                shh(entry.0.origin.id)
             );
 
             return false;
@@ -171,8 +171,8 @@ impl Store {
         // check if entry timestamp is not older than allowed time
         if ts - entry.0.timestamp > consts::REPUBLISH_TIME {
             warn!(
-                "timestamp for entry from {:x} is older than {} seconds",
-                entry.0.origin.id,
+                "timestamp for entry from {} is older than {} seconds",
+                shh(entry.0.origin.id),
                 consts::REPUBLISH_TIME
             );
             return false;
@@ -182,8 +182,8 @@ impl Store {
         if let Value::ProviderRecord(ProviderRecord { expiry: e, .. }) = entry.0.value {
             if ts > e {
                 warn!(
-                    "provider record from {:x} has passed its expiry of {}",
-                    entry.0.origin.id, e
+                    "provider record from {} has passed its expiry of {}",
+                    shh(entry.0.origin.id), e
                 );
                 return false;
             }

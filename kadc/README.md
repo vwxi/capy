@@ -1,6 +1,6 @@
 # kad
 
-kad is an implementation of a distributed hash table based on the [Kademlia protocol](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf) with features from [S/Kademlia](https://ieeexplore.ieee.org/document/4447808/) 
+kad is an implementation of a distributed hash table based on the [Kademlia protocol](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf) with features from [S/Kademlia](https://ieeexplore.ieee.org/document/4447808/)   
 
 ## features
 
@@ -30,3 +30,7 @@ if node.join("bootstrap.example", 16162) {
 
 node.stop::<IGD>();
 ```
+
+# kadc
+
+kadc is an extension to kad with support for RPC with object capabilities, based on OCapN

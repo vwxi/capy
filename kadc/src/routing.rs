@@ -1,6 +1,6 @@
 use crate::{
     node::{InnerKad, Pinger},
-    util::{timestamp, Hash, Peer, SinglePeer},
+    util::{shh, timestamp, Hash, Peer, SinglePeer},
 };
 use futures::future::{BoxFuture, FutureExt};
 use rand::Rng;
@@ -81,7 +81,7 @@ impl Bucket {
     }
 
     fn add_peer(&mut self, peer: SinglePeer) {
-        debug!("added peer {:#x}", peer.id);
+        debug!("added peer {}", shh(peer.id));
 
         self.peers.push(peer.peer());
         self.last_seen = timestamp();
@@ -101,7 +101,7 @@ impl Bucket {
             }
 
             // add new node anyways
-            debug!("adding new node to cache {:#x}", peer.id);
+            debug!("adding new node to cache {}", shh(peer.id));
             self.cache.push(peer);
         }
 
@@ -122,7 +122,7 @@ impl Bucket {
                 && entry.addresses.len() < consts::ADDRESS_LIMIT
             {
                 // add to address list
-                debug!("new address {:?} for node {:#x}", peer.addr, entry.id);
+                debug!("new address {:?} for node {}", peer.addr, shh(entry.id));
                 entry.addresses.push((peer.addr, 0));
             }
 
@@ -439,9 +439,9 @@ impl RoutingTable {
                             bkt.peers.push(t);
                         }
 
-                        debug!("pending node {:#x} updated", peer.id);
+                        debug!("pending node {} updated", shh(peer.id));
                     } else {
-                        debug!("removed address {:?} for {:#x}", addr_entry.0, peer.id);
+                        debug!("removed address {:?} for {}", addr_entry.0, shh(peer.id));
 
                         {
                             let addrs: &mut Vec<(_, usize)> =
@@ -452,13 +452,13 @@ impl RoutingTable {
                             if addrs.is_empty() {
                                 if let Some(replacement) = bkt.cache.pop() {
                                     debug!(
-                                        "adding {:#x} from cache to bucket and removing {:#x}",
-                                        replacement.id, peer.id
+                                        "adding {} from cache to bucket and removing {}",
+                                        shh(replacement.id), shh(peer.id)
                                     );
 
                                     bkt.add_peer(replacement);
                                 } else {
-                                    debug!("nothing in cache, erasing node {:#x}", peer.id);
+                                    debug!("nothing in cache, erasing node {}", shh(peer.id));
                                 }
 
                                 // remove peer from bucket
@@ -470,7 +470,7 @@ impl RoutingTable {
                                 // remove peer from keyring
                                 node.crypto.remove(&peer.id).await;
                             } else {
-                                debug!("node {:#x} still has addresses in entry", peer.id);
+                                debug!("node {} still has addresses in entry", shh(peer.id));
                             }
                         }
                     }
@@ -479,8 +479,8 @@ impl RoutingTable {
 
                     if bkt_entry.addresses.len() < consts::ADDRESS_LIMIT {
                         debug!(
-                            "new address {:?} for existing node {:#x}",
-                            peer.addr, peer.id
+                            "new address {:?} for existing node {}",
+                            peer.addr, shh(peer.id)
                         );
 
                         bkt_entry.addresses.push((peer.addr, 0));
@@ -535,15 +535,15 @@ impl RoutingTable {
                             if addrs.is_empty() {
                                 if let Some(replacement) = bkt.cache.pop() {
                                     debug!(
-                                        "adding {:#x} from cache to bucket and removing {:#x}",
-                                        replacement.id, peer.id
+                                        "adding {} from cache to bucket and removing {}",
+                                        shh(replacement.id), shh(peer.id)
                                     );
 
                                     bkt.add_peer(replacement);
                                 } else {
                                     debug!(
-                                        "nothing in cache, erasing node {:#x} and adding peer {:#x}",
-                                        peer.id, to_add.id
+                                        "nothing in cache, erasing node {} and adding peer {}",
+                                        shh(peer.id), shh(to_add.id)
                                     );
 
                                     bkt.add_peer(to_add);

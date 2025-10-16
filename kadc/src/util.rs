@@ -148,10 +148,23 @@ pub fn b58d(s: &str) -> Option<Hash> {
 }
 
 pub fn b58e(h: Hash) -> String {
-    let mut temp: Vec<u8> = Vec::with_capacity(32);
+    let mut temp: Vec<u8> = vec![0; 32];
     h.to_little_endian(&mut temp[..]);
 
     bs58::encode(temp.as_slice()).into_string()
+}
+
+/// shorten hash to string
+pub fn shh(h: Hash) -> String {
+    let s = b58e(h);
+    let end = s.len() - 5;
+    let mut st = String::new();
+    
+    st += &s[0..5];
+    st += "...";
+    st += &s[end..];
+
+    st
 }
 
 pub(crate) fn timestamp() -> u64 {
@@ -225,6 +238,8 @@ crate::util::pred_block! {
             
             // objects
             StartSession,
+            Abort(String),
+            DeliverOnly(crate::vat::Descriptor, String, Vec<crate::vat::Value>), 
         }
 
         pub(crate) enum FindValueResult {
@@ -236,7 +251,7 @@ crate::util::pred_block! {
 
     #[derive(Clone, Debug, Serialize, Deserialize)] {
         pub(crate) enum RpcResult {
-            Bad,
+            Bad(String),
             Key(String),
             Ping,
             Store,
@@ -244,7 +259,9 @@ crate::util::pred_block! {
             GetConfidence(f64),
             FindNode(Vec<SinglePeer>),
             FindValue(Box<FindValueResult>),
-            StartSession(RemoteRef)
+            StartSession(RemoteRef),
+            Abort,
+            DeliverOnly,
         }
 
         pub(crate) struct RpcContext {

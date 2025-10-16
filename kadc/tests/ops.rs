@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use kad::{
+    use kadc::{
         forward::NoFwd,
         node::Kad,
         util::{Kvs, Peer},

@@ -15,7 +15,7 @@ use crate::{
     node::InnerKad,
     routing::{self, consts::ALPHA},
     store::StoreEntry,
-    util::{FindValueResult, Hash, Peer, SinglePeer},
+    util::{shh, FindValueResult, Hash, Peer, SinglePeer},
 };
 
 impl InnerKad {
@@ -127,7 +127,7 @@ impl InnerKad {
 
                         // if seen already, we exclude this "claimed" peer
                         if lock.iter().any(|&x| x == peer.id) {
-                            debug!("disjoint: {:#x} already seen, excluding", peer.id);
+                            debug!("disjoint: {} already seen, excluding", shh(peer.id));
                             i = i.saturating_sub(1);
                             continue;
                         }
@@ -141,7 +141,7 @@ impl InnerKad {
                     peer = self.table.clone().resolve(peer).await;
 
                     // spawn new task
-                    debug!("querying peer {:#x}", peer.id);
+                    debug!("querying peer {}", shh(peer.id));
 
                     let (new_self, new_peer) = (self.clone(), peer.clone());
                     tasks.push(async move {
@@ -190,7 +190,7 @@ impl InnerKad {
         pb: &mut Vec<SinglePeer>,
         po: &mut Vec<SinglePeer>,
     ) {
-        debug!("received value from {:#x}", peer.id);
+        debug!("received value from {}", shh(peer.id));
 
         match best {
             // if this is the first value seen,
@@ -309,7 +309,7 @@ impl InnerKad {
                     let handle = kad.runtime.handle();
 
                     for p in &po {
-                        debug!("storing best value at {:#x}", p.id);
+                        debug!("storing best value at {}", shh(p.id));
 
                         tokio::task::block_in_place(|| {
                             let _ = self.clone().store(
@@ -371,7 +371,7 @@ impl InnerKad {
                         }
                     }
                     (None, peer) => {
-                        debug!("timeout/error from {:#x}", peer.id);
+                        debug!("timeout/error from {}", shh(peer.id));
                         continue;
                     }
                 }
