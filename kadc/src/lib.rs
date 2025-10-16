@@ -6,8 +6,8 @@ mod routing;
 mod rpc;
 mod score;
 mod store;
-pub mod vat;
 pub mod util;
+pub mod vat;
 
 uint::construct_uint!(
     #[derive(serde::Serialize, serde::Deserialize)]

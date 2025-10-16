@@ -10,7 +10,10 @@ use futures::{
     prelude::*,
 };
 use serde::{Deserialize, Serialize};
-use std::{sync::{atomic::AtomicU64, Arc}, time::Duration};
+use std::{
+    sync::{atomic::AtomicU64, Arc},
+    time::Duration,
+};
 use tarpc::{
     client, context,
     server::{BaseChannel, Channel},
@@ -37,7 +40,7 @@ pub(crate) trait RpcService {
     async fn store(args: RpcArgs) -> RpcResults;
     async fn find_node(args: RpcArgs) -> RpcResults;
     async fn find_value(args: RpcArgs) -> RpcResults;
-    
+
     // object commands
     async fn start_session(args: RpcArgs) -> RpcResults;
     async fn abort(args: RpcArgs) -> RpcResults;
@@ -102,10 +105,10 @@ impl Service {
         {
             Ok(())
         } else {
-            Err(self
-                .node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("crypto verify fail"))))
+            Err(self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("crypto verify fail")),
+            ))
         }
     }
 }
@@ -186,9 +189,10 @@ impl RpcService for Service {
                 },
             )
         } else {
-            self.node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+            self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("invalid operation")),
+            )
         }
     }
 
@@ -236,9 +240,10 @@ impl RpcService for Service {
                 )
             }
         } else {
-            self.node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+            self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("invalid operation")),
+            )
         }
     }
 
@@ -258,18 +263,24 @@ impl RpcService for Service {
 
                 // check for duplicate session
                 if sessions_lock.contains_key(&args.0.id) {
-                    return self.node
-                        .crypto
-                        .results(self.node.create_ctx(), RpcResult::Bad(String::from("duplicate session")));
+                    return self.node.crypto.results(
+                        self.node.create_ctx(),
+                        RpcResult::Bad(String::from("duplicate session")),
+                    );
                 }
 
                 let new_session = Arc::new(Session::new(Arc::downgrade(&self.vat)));
 
                 // export bootstrap object, it will always have an id 0
-                new_session.export(ExportId::from(0), ExportEntry {
-                    ref_count: AtomicU64::new(0),
-                    object: Some(new_session.make_bootstrap())
-                }).await;
+                new_session
+                    .export(
+                        ExportId::from(0),
+                        ExportEntry {
+                            ref_count: AtomicU64::new(0),
+                            object: Some(new_session.make_bootstrap()),
+                        },
+                    )
+                    .await;
 
                 sessions_lock.insert(args.0.id, new_session);
             }
@@ -280,12 +291,13 @@ impl RpcService for Service {
                 RpcResult::StartSession(RemoteRef {
                     peer: self.vat.id,
                     swiss_num: String::from(consts::BOOTSTRAP_SWISS),
-                })
+                }),
             )
         } else {
-            self.node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+            self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("invalid operation")),
+            )
         }
     }
 
@@ -295,19 +307,29 @@ impl RpcService for Service {
         }
 
         if let RpcOp::Abort(reason) = args.0.op {
-            debug!("peer {} is aborting cap session: {}", shh(args.0.id), reason);
+            debug!(
+                "peer {} is aborting cap session: {}",
+                shh(args.0.id),
+                reason
+            );
 
             let mut sessions_lock = self.vat.sessions.write().await;
 
             if sessions_lock.remove(&args.0.id).is_some() {
-                self.node.crypto.results(self.node.create_ctx(), RpcResult::Abort)
+                self.node
+                    .crypto
+                    .results(self.node.create_ctx(), RpcResult::Abort)
             } else {
-                self.node.crypto.results(self.node.create_ctx(), RpcResult::Bad(String::from("no session to abort")))
+                self.node.crypto.results(
+                    self.node.create_ctx(),
+                    RpcResult::Bad(String::from("no session to abort")),
+                )
             }
         } else {
-            self.node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+            self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("invalid operation")),
+            )
         }
     }
 
@@ -327,7 +349,8 @@ impl RpcService for Service {
                 match obj {
                     Descriptor::ReceiverHosted(export_id) => {
                         let exports = session.exports.read().await;
-                        return if exports.get(&export_id)
+                        return if exports
+                            .get(&export_id)
                             .and_then(|export| export.object.as_ref())
                             .and_then(|object| object.methods.get(&method))
                             .and_then(|method| match method(method_args) {
@@ -335,31 +358,38 @@ impl RpcService for Service {
                                 crate::vat::Value::Err(_) => None,
                                 other => Some(other),
                             })
-                            .is_some() {
-                            self.node.crypto.results(self.node.create_ctx(), RpcResult::DeliverOnly)
-                        } else {
+                            .is_some()
+                        {
                             self.node
                                 .crypto
-                                .results(self.node.create_ctx(), RpcResult::Bad(String::from("object/method does not exist")))
+                                .results(self.node.create_ctx(), RpcResult::DeliverOnly)
+                        } else {
+                            self.node.crypto.results(
+                                self.node.create_ctx(),
+                                RpcResult::Bad(String::from("object/method does not exist")),
+                            )
                         };
-                    },
+                    }
                     // we cannot send to references we do not possess
-                    _ => { 
-                        return self.node
-                            .crypto
-                            .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation"))); 
-                    },
+                    _ => {
+                        return self.node.crypto.results(
+                            self.node.create_ctx(),
+                            RpcResult::Bad(String::from("invalid operation")),
+                        );
+                    }
                 }
             } else {
                 // if session does not exist, throw error
-                return self.node
-                    .crypto
-                    .results(self.node.create_ctx(), RpcResult::Bad(String::from("session does not exist")));
+                return self.node.crypto.results(
+                    self.node.create_ctx(),
+                    RpcResult::Bad(String::from("session does not exist")),
+                );
             }
         } else {
-            self.node
-                .crypto
-                .results(self.node.create_ctx(), RpcResult::Bad(String::from("invalid operation")))
+            self.node.crypto.results(
+                self.node.create_ctx(),
+                RpcResult::Bad(String::from("invalid operation")),
+            )
         }
     }
 }
@@ -449,7 +479,7 @@ pub(crate) trait Network {
                                 client: RpcServiceClient::new(client::Config::default(), clt)
                                     .spawn(),
                                 node: node_.clone(),
-                                vat: kad_.vat.clone(), 
+                                vat: kad_.vat.clone(),
                             };
 
                             BaseChannel::with_defaults(srv)
@@ -804,7 +834,11 @@ mod tests {
         let second_addr = second.clone().addr();
         let second_peer = Peer::new(second.clone().id(), second_addr);
 
-        assert!(first.node.clone().start_session(second_peer.clone()).is_ok());
+        assert!(first
+            .node
+            .clone()
+            .start_session(second_peer.clone())
+            .is_ok());
 
         // does the session exist
         let second_ = second.clone();
@@ -816,13 +850,25 @@ mod tests {
         });
 
         // this call should fail because we already started a session
-        assert!(first.node.clone().start_session(second_peer.clone()).is_err());
+        assert!(first
+            .node
+            .clone()
+            .start_session(second_peer.clone())
+            .is_err());
 
         // okay
-        assert!(first.node.clone().abort(second_peer.clone(), String::from("example abort")).is_ok());
-        
+        assert!(first
+            .node
+            .clone()
+            .abort(second_peer.clone(), String::from("example abort"))
+            .is_ok());
+
         // fail
-        assert!(first.node.clone().abort(second_peer, String::from("example abort 2")).is_err());
+        assert!(first
+            .node
+            .clone()
+            .abort(second_peer, String::from("example abort 2"))
+            .is_err());
 
         first.stop::<NoFwd>();
         second.stop::<NoFwd>();

@@ -1,4 +1,9 @@
-use std::{collections::HashMap, error::Error, num::ParseIntError, sync::{atomic::AtomicU64, Arc, Weak}};
+use std::{
+    collections::HashMap,
+    error::Error,
+    num::ParseIntError,
+    sync::{atomic::AtomicU64, Arc, Weak},
+};
 
 pub(crate) type VatId = Hash;
 pub(crate) type ImportId = Hash;
@@ -104,9 +109,15 @@ impl Session {
             fields: HashMap::new(),
             methods: HashMap::from([
                 (String::from(consts::FETCH_SWISS), Self::fetch as Method),
-                (String::from(consts::DEPOSIT_GIFT_SWISS), Self::deposit_gift as Method),
-                (String::from(consts::WITHDRAW_GIFT_SWISS), Self::withdraw_gift as Method),
-            ])
+                (
+                    String::from(consts::DEPOSIT_GIFT_SWISS),
+                    Self::deposit_gift as Method,
+                ),
+                (
+                    String::from(consts::WITHDRAW_GIFT_SWISS),
+                    Self::withdraw_gift as Method,
+                ),
+            ]),
         }
     }
 

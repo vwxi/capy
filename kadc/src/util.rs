@@ -159,7 +159,7 @@ pub fn shh(h: Hash) -> String {
     let s = b58e(h);
     let end = s.len() - 5;
     let mut st = String::new();
-    
+
     st += &s[0..5];
     st += "...";
     st += &s[end..];
@@ -230,16 +230,16 @@ crate::util::pred_block! {
             Ping,
             GetAddresses(Hash),
             GetConfidence(Hash),
-            
+
             // kv
             FindNode(Hash),
             FindValue(Hash),
             Store(Hash, Box<StoreEntry>),
-            
+
             // objects
             StartSession,
             Abort(String),
-            DeliverOnly(crate::vat::Descriptor, String, Vec<crate::vat::Value>), 
+            DeliverOnly(crate::vat::Descriptor, String, Vec<crate::vat::Value>),
         }
 
         pub(crate) enum FindValueResult {

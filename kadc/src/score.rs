@@ -270,14 +270,22 @@ impl ScoreManager {
     pub(crate) async fn increase(&self, peer: Hash) {
         let mut lock = self.scoring.lock().await;
 
-        debug!("change reputation of {} by {}", shh(peer), consts::POSITIVE_R);
+        debug!(
+            "change reputation of {} by {}",
+            shh(peer),
+            consts::POSITIVE_R
+        );
         lock.modify(peer, consts::POSITIVE_R);
     }
 
     pub(crate) async fn decrease(&self, peer: Hash) {
         let mut lock = self.scoring.lock().await;
 
-        debug!("change reputation of {} by {}", shh(peer), consts::NEGATIVE_R);
+        debug!(
+            "change reputation of {} by {}",
+            shh(peer),
+            consts::NEGATIVE_R
+        );
         lock.modify(peer, consts::NEGATIVE_R);
     }
 

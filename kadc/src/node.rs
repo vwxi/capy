@@ -3,9 +3,18 @@
 //! Provides a key-value store, a routing table and methods for protocol primitives
 
 use crate::{
-    crypto::Crypto, forward::Forward, routing::{consts as routing_consts, RoutingTable, TableRef}, rpc::{KadNetwork, Network}, score::ScoreManager, store::{consts as store_consts, Store, StoreEntry}, util::{
-        hash, shh, timestamp, Addr, Data, FindValueResult, Hash, Kv, Peer, ProviderRecord, RpcContext, RpcOp, RpcResult, RpcResults, SinglePeer, Value
-    }, vat::Vat, U256
+    crypto::Crypto,
+    forward::Forward,
+    routing::{consts as routing_consts, RoutingTable, TableRef},
+    rpc::{KadNetwork, Network},
+    score::ScoreManager,
+    store::{consts as store_consts, Store, StoreEntry},
+    util::{
+        hash, shh, timestamp, Addr, Data, FindValueResult, Hash, Kv, Peer, ProviderRecord,
+        RpcContext, RpcOp, RpcResult, RpcResults, SinglePeer, Value,
+    },
+    vat::Vat,
+    U256,
 };
 use anyhow::Result;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
@@ -1239,7 +1248,7 @@ impl InnerKad {
         |node: Arc<InnerKad>, res: RpcResults, resp: SinglePeer| async move {
             if let RpcResult::Abort = res.0.clone() {
                 node.scoring.increase(resp.id).await;
-                
+
                 Ok(((), resp))
             } else {
                 node.scoring.decrease(resp.id).await;

@@ -453,7 +453,8 @@ impl RoutingTable {
                                 if let Some(replacement) = bkt.cache.pop() {
                                     debug!(
                                         "adding {} from cache to bucket and removing {}",
-                                        shh(replacement.id), shh(peer.id)
+                                        shh(replacement.id),
+                                        shh(peer.id)
                                     );
 
                                     bkt.add_peer(replacement);
@@ -480,7 +481,8 @@ impl RoutingTable {
                     if bkt_entry.addresses.len() < consts::ADDRESS_LIMIT {
                         debug!(
                             "new address {:?} for existing node {}",
-                            peer.addr, shh(peer.id)
+                            peer.addr,
+                            shh(peer.id)
                         );
 
                         bkt_entry.addresses.push((peer.addr, 0));
@@ -536,14 +538,16 @@ impl RoutingTable {
                                 if let Some(replacement) = bkt.cache.pop() {
                                     debug!(
                                         "adding {} from cache to bucket and removing {}",
-                                        shh(replacement.id), shh(peer.id)
+                                        shh(replacement.id),
+                                        shh(peer.id)
                                     );
 
                                     bkt.add_peer(replacement);
                                 } else {
                                     debug!(
                                         "nothing in cache, erasing node {} and adding peer {}",
-                                        shh(peer.id), shh(to_add.id)
+                                        shh(peer.id),
+                                        shh(to_add.id)
                                     );
 
                                     bkt.add_peer(to_add);

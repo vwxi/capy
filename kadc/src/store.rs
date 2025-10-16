@@ -183,7 +183,8 @@ impl Store {
             if ts > e {
                 warn!(
                     "provider record from {} has passed its expiry of {}",
-                    shh(entry.0.origin.id), e
+                    shh(entry.0.origin.id),
+                    e
                 );
                 return false;
             }
