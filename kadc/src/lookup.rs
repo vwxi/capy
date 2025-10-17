@@ -32,7 +32,7 @@ impl InnerKad {
         // all peers contacted regardless of response
         let mut visited: Vec<SinglePeer> = vec![];
 
-        if let Some(mut closest_node) = shortlist.iter().cloned().min_by_key(|x| (x.id ^ key)) {
+        if let Some(mut closest_node) = shortlist.iter().cloned().min_by_key(|x| x.id ^ key) {
             let mut first = true;
             while !shortlist.is_empty() {
                 for _ in 0..ALPHA {
@@ -83,7 +83,7 @@ impl InnerKad {
                     break;
                 }
 
-                shortlist.make_contiguous().sort_by_key(|x| (x.id ^ key));
+                shortlist.make_contiguous().sort_by_key(|x| x.id ^ key);
 
                 if let Some(candidate) = shortlist
                     .iter()

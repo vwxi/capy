@@ -134,7 +134,7 @@ pub fn hash(s: &str) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(s.as_bytes());
 
-    Hash::from_little_endian(hasher.finalize().as_mut_slice())
+    Hash::from_little_endian(&hasher.finalize())
 }
 
 pub fn b58d(s: &str) -> Option<Hash> {
