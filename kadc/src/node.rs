@@ -387,7 +387,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10000, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -439,7 +439,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10002, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -503,7 +503,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10003, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -539,7 +539,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::{Kvs, Hash}};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10004, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -621,7 +621,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::Hash};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10005, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -643,7 +643,7 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::{Kvs, ProviderRecord}};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10006, false, true).unwrap();
     /// node.clone().serve().unwrap();
     ///
     /// // join etc...
@@ -694,12 +694,15 @@ impl Kad {
     /// ```
     /// use kadc::{node::Kad, forward::IGD, util::Kvs};
     ///
-    /// let node = Kad::new::<IGD>(16161, false, true).unwrap();
+    /// let node = Kad::new::<IGD>(10007, false, true).unwrap();
+    /// let to_join = Kad::new::<IGD>(10008, false, true).unwrap();
     /// node.clone().serve().unwrap();
+    /// to_join.clone().serve().unwrap();
     ///
-    /// assert!(node.join("127.0.0.1", 16162));
+    /// assert!(node.join("127.0.0.1", 10008));
     ///
     /// node.stop::<IGD>();
+    /// to_join.stop::<IGD>();
     /// ```
     ///
     /// # Return value
